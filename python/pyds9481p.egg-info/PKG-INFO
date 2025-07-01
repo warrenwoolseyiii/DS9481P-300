@@ -1,3 +1,19 @@
+Metadata-Version: 2.1
+Name: pyds9481p
+Version: 0.1.0
+Summary: A Python wrapper for the DS9481P-300 USB to 1-Wire/I2C adapter.
+Home-page: https://github.com/your_username/your_repo
+Author: Roo
+Author-email: roo@example.com
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: MacOS
+Classifier: Operating System :: POSIX
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+
 # DS9481P-300 Driver
 
 Open source driver and software interface for the DS9481P-300 USB to I2C / 1-Wire adapter.
@@ -186,3 +202,5 @@ To add new functionality (e.g., 1-Wire commands):
 2.  Implement the function in `src/ds9481p.c`.
 3.  Rebuild the C library (`cd build && make`).
 4.  Add the function prototype and a corresponding Python method in `python/pyds9481p/__init__.py`.
+
+
