@@ -125,6 +125,8 @@ static int read_byte_with_command(ds9481p_device_handle handle, char cmd, unsign
         perror("read_byte_with_command: write failed");
         return -1;
     }
+    // Add a short delay to give the device time to respond
+    usleep(10000); // 10ms
     if (read(handle->fd, byte, 1) != 1) {
         perror("read_byte_with_command: read failed");
         return -1;
@@ -138,6 +140,23 @@ DS9481P_API int ds9481p_i2c_read_byte_ack(ds9481p_device_handle handle, unsigned
 
 DS9481P_API int ds9481p_i2c_read_byte_nack(ds9481p_device_handle handle, unsigned char* byte) {
     return read_byte_with_command(handle, 'N', byte); // 0x4E
+}
+
+DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, int* minor) {
+    if (!handle || !major || !minor) {
+        return -1;
+    }
+
+    unsigned char version_byte;
+    if (read_byte_with_command(handle, 'V', &version_byte) != 0) { // 0x56
+        perror("ds9481p_get_version: failed to read version");
+        return -1;
+    }
+
+    *major = (version_byte >> 4) & 0x0F;
+    *minor = version_byte & 0x0F;
+
+    return 0;
 }
 
 DS9481P_API int ds9481p_enter_1wire_mode(ds9481p_device_handle handle) {

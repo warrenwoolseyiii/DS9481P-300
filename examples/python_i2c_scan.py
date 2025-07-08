@@ -21,6 +21,10 @@ def main():
             # Switch to I2C mode
             device.enter_i2c_mode()
             print("Switched to I2C mode.")
+
+            # Get and display firmware version
+            major, minor = device.get_version()
+            print(f"Device Firmware Version: {major}.{minor}")
             time.sleep(0.1) # Short delay after mode switch
 
             # --- Scan for I2C devices ---

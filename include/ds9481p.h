@@ -94,6 +94,16 @@ DS9481P_API int ds9481p_i2c_read_byte_ack(ds9481p_device_handle handle, unsigned
  */
 DS9481P_API int ds9481p_i2c_read_byte_nack(ds9481p_device_handle handle, unsigned char* byte);
 
+/**
+ * @brief Reads the version of the adapter firmware.
+ *
+ * @param handle A valid device handle.
+ * @param major Pointer to store the major version number.
+ * @param minor Pointer to store the minor version number.
+ * @return 0 on success, -1 on failure.
+ */
+DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, int* minor);
+
 
 #ifdef __cplusplus
 }

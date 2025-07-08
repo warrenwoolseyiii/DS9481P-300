@@ -60,6 +60,13 @@ int main(int argc, char *argv[]) {
     printf("Switched to I2C mode.\n");
     usleep(100000); // 100ms delay
 
+    int major, minor;
+    if (ds9481p_get_version(handle, &major, &minor) == 0) {
+        printf("Device Firmware Version: %d.%d\n", major, minor);
+    } else {
+        fprintf(stderr, "Failed to get device version.\n");
+    }
+
     scan_i2c_bus(handle);
 
     ds9481p_close(handle);

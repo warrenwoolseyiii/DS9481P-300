@@ -52,6 +52,9 @@ _lib.ds9481p_i2c_read_byte_ack.restype = ctypes.c_int
 _lib.ds9481p_i2c_read_byte_nack.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ubyte)]
 _lib.ds9481p_i2c_read_byte_nack.restype = ctypes.c_int
 
+_lib.ds9481p_get_version.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+_lib.ds9481p_get_version.restype = ctypes.c_int
+
 
 # --- Python Wrapper Class ---
 class DS9481P:
@@ -109,3 +112,11 @@ class DS9481P:
             if _lib.ds9481p_i2c_read_byte_nack(self._handle, ctypes.byref(byte)) != 0:
                 raise RuntimeError("I2C read byte with NACK failed")
         return byte.value
+
+    def get_version(self):
+        """Gets the firmware version of the adapter."""
+        major = ctypes.c_int()
+        minor = ctypes.c_int()
+        if _lib.ds9481p_get_version(self._handle, ctypes.byref(major), ctypes.byref(minor)) != 0:
+            raise RuntimeError("Failed to get device version")
+        return (major.value, minor.value)
