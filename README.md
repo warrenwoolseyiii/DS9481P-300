@@ -4,6 +4,49 @@ Open source driver and software interface for the DS9481P-300 USB to I2C / 1-Wir
 
 This repository contains a C/C++ shared library (`libds9481p`) and a Python wrapper (`pyds9481p`) to control the DS9481P-300 on macOS.
 
+---
+
+## Quick Start
+
+```bash
+# Prerequisites: Xcode Command Line Tools, CMake 3.10+, Python 3.6+
+brew install cmake                    # macOS
+
+# 1. Build the shared library
+make                                  # → build/libds9481p.dylib
+
+# 2. Build & run the C example
+make examples                         # → examples/c/build/c_i2c_scan
+./examples/c/build/c_i2c_scan /dev/tty.usbmodemXXXX
+
+# 3. Install the Python wrapper & run the Python example
+pip install -e python
+python examples/python/python_i2c_scan.py /dev/tty.usbmodemXXXX
+
+# Clean everything
+make clean                            # wipes build/ and examples/c/build/
+```
+
+*(Replace `/dev/tty.usbmodemXXXX` with your device's actual port — run `ls /dev/tty.usbmodem*` to find it.)*
+
+---
+
+## Make Targets
+
+| Target | Description |
+|--------|-------------|
+| `make` / `make all` | Configure and build the library into `build/` |
+| `make examples` | Build the library + the C example into `examples/c/build/` |
+| `make clean` | Remove `build/` and `examples/c/build/` |
+
+Extra CMake flags can be passed via `CMAKE_FLAGS`:
+
+```bash
+make CMAKE_FLAGS="-DDS9481P_ENABLE_DEBUG=ON"   # enable verbose serial tracing
+```
+
+---
+
 ## Prerequisites
 
 - A C/C++ compiler (like Apple Clang, which comes with Xcode Command Line Tools)
@@ -11,22 +54,27 @@ This repository contains a C/C++ shared library (`libds9481p`) and a Python wrap
 - Python 3.6 or higher
 - The DS9481P-300 device should be recognized as a serial port by macOS (e.g., `/dev/tty.usbmodemXXXX`).
 
+---
+
 ## Installation
 
 The project is composed of a C/C++ core library and a Python wrapper. You must build the C/C++ library first.
 
 ### 1. Build the C/C++ Library (`libds9481p`)
 
-From the root of the project directory, run the following commands to build the shared library:
+From the root of the project directory, run:
 
 ```bash
-mkdir -p build
-cd build
-cmake ..
-make
+make                       # configure + build into build/
 ```
 
-This will create the `libds9481p.dylib` file inside the `build` directory.
+This will create the `libds9481p.dylib` (macOS) or `libds9481p.so` (Linux) file inside the `build/` directory.
+
+To wipe the build directory and start fresh:
+
+```bash
+make clean                 # removes build/ and examples/c/build/
+```
 
 ### 2. Install the Python Wrapper (`pyds9481p`)
 
@@ -37,6 +85,8 @@ From the root of the project directory, run:
 ```bash
 pip install -e python
 ```
+
+---
 
 ## Usage
 
@@ -50,7 +100,7 @@ This script scans the I2C bus and prints the addresses of any devices that respo
 2.  Run the script from the root of the project, providing the serial port name as an argument:
 
 ```bash
-python examples/python_i2c_scan.py /dev/tty.usbmodemXXXX
+python examples/python/python_i2c_scan.py /dev/tty.usbmodemXXXX
 ```
 *(Replace `/dev/tty.usbmodemXXXX` with your device's actual port name.)*
 
@@ -58,17 +108,13 @@ python examples/python_i2c_scan.py /dev/tty.usbmodemXXXX
 
 This example does the same thing as the Python script but is written in C.
 
-1.  **Build the main `libds9481p` library** first by running `make` in the `build` directory.
-2.  Navigate to the C example directory and build the example:
+1.  **Build the library and example** from the project root:
     ```bash
-    mkdir -p examples/c/build
-    cd examples/c/build
-    cmake ..
-    make
+    make examples             # builds libds9481p + the C example
     ```
-3.  Run the compiled executable from the `examples/c/build` directory:
+2.  Run the compiled executable:
     ```bash
-    ./c_i2c_scan /dev/tty.usbmodemXXXX
+    ./examples/c/build/c_i2c_scan /dev/tty.usbmodemXXXX
     ```
 
 ---
@@ -173,16 +219,18 @@ To use the library in a C/C++ project, you need to link against the `libds9481p.
     target_link_libraries(my_app ds9481p)
     ```
 
+---
+
 ## For Developers
 
 The core logic is implemented in C for portability and performance. The Python wrapper uses `ctypes` to call the C functions, avoiding the need for a separate compilation step for the wrapper itself.
 
 -   **C Library:** `src/ds9481p.c`, `include/ds9481p.h`
 -   **Python Wrapper:** `python/pyds9481p/__init__.py`
--   **Build System:** `CMakeLists.txt`
+-   **Build System:** `Makefile` (wraps `CMakeLists.txt` via CMake)
 
 To add new functionality (e.g., 1-Wire commands):
 1.  Add the function signature to `include/ds9481p.h`.
 2.  Implement the function in `src/ds9481p.c`.
-3.  Rebuild the C library (`cd build && make`).
+3.  Rebuild the C library (`make`).
 4.  Add the function prototype and a corresponding Python method in `python/pyds9481p/__init__.py`.
