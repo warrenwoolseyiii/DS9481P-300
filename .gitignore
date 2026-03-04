@@ -1,1 +1,5 @@
 build/
+
+python/pyds9481p/__pycache__/
+
+python/pyds9481p.egg-info/PKG-INFO
