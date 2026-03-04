@@ -98,9 +98,14 @@ DS9481P_API int ds9481p_enter_i2c_mode(ds9481p_device_handle handle) {
         return -1;
     }
 
-    // Reset adapter, then enter I2C mode
-    char commands[] = { 0xC1, 0xE5 };
-    if (write(handle->fd, commands, sizeof(commands)) != sizeof(commands)) {
+    // Reset adapter
+    if (ds9481p_reset_adapter(handle) != 0) {
+        perror("ds9481p_enter_i2c_mode: failed to reset adapter");
+        return -1;
+    }
+
+    char cmd = 0xE5; // Enter I2C mode command
+    if (write(handle->fd, &cmd, 1) != 1) {
         perror("ds9481p_enter_i2c_mode: write failed");
         return -1;
     }
@@ -113,7 +118,7 @@ DS9481P_API int ds9481p_enter_i2c_mode(ds9481p_device_handle handle) {
 
 DS9481P_API int ds9481p_i2c_start(ds9481p_device_handle handle) {
     if (!handle) return -1;
-    char cmd = 'S'; // 0x53
+    char cmd = 0x53; // I2C start command
     if (write(handle->fd, &cmd, 1) != 1) {
         perror("ds9481p_i2c_start: write failed");
         return -1;
@@ -123,7 +128,7 @@ DS9481P_API int ds9481p_i2c_start(ds9481p_device_handle handle) {
 
 DS9481P_API int ds9481p_i2c_stop(ds9481p_device_handle handle) {
     if (!handle) return -1;
-    char cmd = 'P'; // 0x50
+    char cmd = 0x50; // I2C stop command
     if (write(handle->fd, &cmd, 1) != 1) {
         perror("ds9481p_i2c_stop: write failed");
         return -1;
@@ -133,12 +138,20 @@ DS9481P_API int ds9481p_i2c_stop(ds9481p_device_handle handle) {
 
 DS9481P_API int ds9481p_i2c_write_byte(ds9481p_device_handle handle, unsigned char byte) {
     if (!handle) return -1;
-    char cmd[] = { 'W', byte }; // 0x57
+    char cmd[] = { 0x57, byte }; // I2C write byte command
     if (write(handle->fd, cmd, sizeof(cmd)) != sizeof(cmd)) {
         perror("ds9481p_i2c_write_byte: write failed");
         return -1;
     }
-    return 0;
+    unsigned char status = 0;
+    if(ds9481p_read_status(handle, &status) != 0) {
+        perror("ds9481p_i2c_write_byte: read status failed");
+        return -1;
+    }
+    if(status != 0) {
+        perror("ds9481p_i2c_write_byte: I2C write error");
+    }
+    return (status == 0) ? 0 : -1;
 }
 
 static int read_byte_with_command(ds9481p_device_handle handle, char cmd, unsigned char* byte) {
@@ -157,11 +170,11 @@ static int read_byte_with_command(ds9481p_device_handle handle, char cmd, unsign
 }
 
 DS9481P_API int ds9481p_i2c_read_byte_ack(ds9481p_device_handle handle, unsigned char* byte) {
-    return read_byte_with_command(handle, 'R', byte); // 0x52
+    return read_byte_with_command(handle, 0x52, byte); // I2C read byte with ACK
 }
 
 DS9481P_API int ds9481p_i2c_read_byte_nack(ds9481p_device_handle handle, unsigned char* byte) {
-    return read_byte_with_command(handle, 'N', byte); // 0x4E
+    return read_byte_with_command(handle, 0x4E, byte); // I2C read byte with NACK
 }
 
 DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, int* minor) {
@@ -170,7 +183,7 @@ DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, in
     }
 
     unsigned char version_byte;
-    if (read_byte_with_command(handle, 'V', &version_byte) != 0) { // 0x56
+    if (read_byte_with_command(handle, 0x56, &version_byte) != 0) { // Get version command
         perror("ds9481p_get_version: failed to read version");
         return -1;
     }
@@ -179,6 +192,27 @@ DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, in
     *minor = version_byte & 0x0F;
 
     return 0;
+}
+
+DS9481P_API int ds9481p_reset_adapter(ds9481p_device_handle handle) {
+    if(!handle) {
+        return -1;
+    }
+
+    char cmd = 0xC1; // Reset adapter command
+    if (write(handle->fd, &cmd, 1) != 1) {
+        perror("ds9481p_reset_adapter: write failed");
+        return -1;
+    }
+
+    // Wait for the device to be ready
+    usleep(100000); // 100ms
+
+    return 0;
+}
+
+DS9481P_API int ds9481p_read_status(ds9481p_device_handle handle, unsigned char* status) {
+    return read_byte_with_command(handle, 0x48, status); // Read status command
 }
 
 DS9481P_API int ds9481p_enter_1wire_mode(ds9481p_device_handle handle) {

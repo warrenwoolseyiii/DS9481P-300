@@ -126,6 +126,19 @@ DS9481P_API int ds9481p_i2c_read_byte_nack(ds9481p_device_handle handle, unsigne
  */
 DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, int* minor);
 
+/**
+ * @brief Sends the reset adapter command.
+ * @return 0 on success, -1 on failure.
+ */
+DS9481P_API int ds9481p_reset_adapter(ds9481p_device_handle handle);
+
+/**
+ * @brief Reads the status register and returns the value.
+ * @param handle A valid device handle.
+ * @param status Pointer to store the status register value.
+ * @return 0 on success, -1 on failure.
+ */
+DS9481P_API int ds9481p_read_status(ds9481p_device_handle handle, unsigned char* status);
 
 #ifdef __cplusplus
 }
