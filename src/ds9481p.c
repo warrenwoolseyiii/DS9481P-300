@@ -34,6 +34,27 @@
   #define DBG(fmt, ...) ((void)0)
 #endif
 
+// Command definitions
+static const uint8_t CMD_RESET_ADAPTER = 0xC1;
+static const uint8_t CMD_ENTER_I2C_MODE = 0xE5;
+static const uint8_t CMD_START = 0x53; // 'S'
+static const uint8_t CMD_STOP = 0x50; // 'P'
+static const uint8_t CMD_REPEATED_START = 0x54; // 'T'
+static const uint8_t CMD_WRITE_BYTE = 0x57; // 'W'
+static const uint8_t CMD_WRITE_BYTE_STATUS = 0x51; // 'Q'
+static const uint8_t CMD_READ_BYTE_ACK = 0x52; // 'R'
+static const uint8_t CMD_READ_BYTE_NACK = 0x4E; // 'N'
+static const uint8_t CMD_READ_STATUS = 0x48; // 'H'
+static const uint8_t CMD_READ_VERSION = 0x56; // 'V'
+static const uint8_t CMD_SET_MODE = 0x4D; // 'M'
+static const uint8_t CMD_RETURN_TO_1_WIRE_MODE[] = {0x43, 0x4F}; // 'CO'
+static const uint8_t CMD_PACKETIZED_DATA = 0x5A; // 'Z'
+
+/**
+ * @brief Macro to print the command and function name
+ */
+#define PRINT_CMD_FUN(cmd) DBG("%s: sending 0x%02X ('%c')", __func__, cmd, cmd)
+
 /**
  * @brief Internal device structure.
  */
@@ -41,14 +62,22 @@ struct ds9481p_device_t {
     int fd; // File descriptor for the serial port
 };
 
+/**
+ * @brief Internal record of the port name
+ */
+char _port_name[256];
+
 DS9481P_API ds9481p_device_handle ds9481p_open(const char* port_name) {
     if (!port_name) {
         DBG("open: port_name is NULL");
         return NULL;
     }
-    DBG("open: opening %s", port_name);
+    
+    memset(_port_name, 0, sizeof(_port_name));
+    strncpy(_port_name, port_name, sizeof(_port_name) - 1);
+    DBG("open: opening %s", _port_name);
 
-    int fd = open(port_name, O_RDWR | O_NOCTTY | O_NDELAY);
+    int fd = open(_port_name, O_RDWR | O_NOCTTY | O_NDELAY);
     if (fd == -1) {
         perror("open_port: Unable to open port");
         return NULL;
@@ -116,8 +145,8 @@ DS9481P_API int ds9481p_enter_i2c_mode(ds9481p_device_handle handle) {
         return -1;
     }
 
-    DBG("enter_i2c_mode: sending 0xE5 (I2C mode)");
-    char cmd = 0xE5; // Enter I2C mode command
+    uint8_t cmd = CMD_ENTER_I2C_MODE;
+    PRINT_CMD_FUN(cmd);
     if (write(handle->fd, &cmd, 1) != 1) {
         perror("ds9481p_enter_i2c_mode: write failed");
         return -1;
@@ -132,8 +161,8 @@ DS9481P_API int ds9481p_enter_i2c_mode(ds9481p_device_handle handle) {
 
 DS9481P_API int ds9481p_i2c_start(ds9481p_device_handle handle) {
     if (!handle) return -1;
-    DBG("i2c_start: sending 0x53 ('S')");
-    char cmd = 0x53; // I2C start command
+    uint8_t cmd = CMD_START;
+    PRINT_CMD_FUN(cmd);
     if (write(handle->fd, &cmd, 1) != 1) {
         perror("ds9481p_i2c_start: write failed");
         return -1;
@@ -141,10 +170,21 @@ DS9481P_API int ds9481p_i2c_start(ds9481p_device_handle handle) {
     return 0;
 }
 
+DS9481P_API int ds9481p_i2c_repeated_start(ds9481p_device_handle handle) {
+    if (!handle) return -1;
+    uint8_t cmd = CMD_REPEATED_START;
+    PRINT_CMD_FUN(cmd);
+    if (write(handle->fd, &cmd, 1) != 1) {
+        perror("ds9481p_i2c_repeated_start: write failed");
+        return -1;
+    }
+    return 0;
+}
+
 DS9481P_API int ds9481p_i2c_stop(ds9481p_device_handle handle) {
     if (!handle) return -1;
-    DBG("i2c_stop: sending 0x50 ('P')");
-    char cmd = 0x50; // I2C stop command
+    uint8_t cmd = CMD_STOP;
+    PRINT_CMD_FUN(cmd);
     if (write(handle->fd, &cmd, 1) != 1) {
         perror("ds9481p_i2c_stop: write failed");
         return -1;
@@ -154,64 +194,97 @@ DS9481P_API int ds9481p_i2c_stop(ds9481p_device_handle handle) {
 
 DS9481P_API int ds9481p_i2c_write_byte(ds9481p_device_handle handle, unsigned char byte) {
     if (!handle) return -1;
-    DBG("i2c_write_byte: sending 0x51 0x%02X ('Q' + 0x%02X)", byte, byte);
-    char cmd[] = { 0x51, byte }; // I2C write byte command
+    uint8_t cmd[] = {CMD_WRITE_BYTE, byte};
+    PRINT_CMD_FUN(cmd[0]);
+    DBG("i2c_write_byte: sending byte 0x%02X ('%c')", byte, byte);
     if (write(handle->fd, cmd, sizeof(cmd)) != sizeof(cmd)) {
         perror("ds9481p_i2c_write_byte: write failed");
         return -1;
     }
-    unsigned char status;
-    if (read(handle->fd, &status, 1) != 1) {
-        perror("ds9481p_i2c_write_byte: read status failed");
-        return -1;
-    }
-    DBG("i2c_write_byte: status=0x%02X for byte 0x%02X", status, byte);
-    return (status == 0x01) ? -1 : 0;
+    return 0;
 }
 
-static int read_byte_with_command(ds9481p_device_handle handle, char cmd, unsigned char* byte) {
-    if (!handle || !byte) return -1;
-    DBG("read_byte_with_cmd: sending 0x%02X ('%c')", (unsigned char)cmd,
-        (cmd >= 0x20 && cmd < 0x7F) ? cmd : '.');
-    if (write(handle->fd, &cmd, 1) != 1) {
-        perror("read_byte_with_command: write failed");
+DS9481P_API int ds9481p_i2c_write_byte_status(ds9481p_device_handle handle, unsigned char byte, unsigned char* status) {
+    if(!handle || !status) return -1;
+    
+    // Flush the read buffer so we don't get stale content
+    tcflush(handle->fd, TCIFLUSH);
+
+    uint8_t cmd[] = {CMD_WRITE_BYTE_STATUS, byte};
+    PRINT_CMD_FUN(cmd[0]);
+    DBG("i2c_write_byte_status: sending byte 0x%02X ('%c')", byte, byte);
+    if (write(handle->fd, cmd, sizeof(cmd)) != sizeof(cmd)) {
+        perror("ds9481p_i2c_write_byte_status: write failed");
         return -1;
     }
-    // Add a short delay to give the device time to respond
+
+    // Short delay to allow device to respond
     usleep(10000); // 10ms
-    ssize_t n = read(handle->fd, byte, 1);
-    if (n != 1) {
-        DBG("read_byte_with_cmd: read returned %zd (expected 1) for cmd 0x%02X", n, (unsigned char)cmd);
-        perror("read_byte_with_command: read failed");
+    if (read(handle->fd, status, 1) != 1) {
+        perror("ds9481p_i2c_write_byte_status: read status failed");
         return -1;
     }
-    DBG("read_byte_with_cmd: cmd 0x%02X → response 0x%02X", (unsigned char)cmd, *byte);
+
+    DBG("i2c_write_byte_status: status=0x%02X", *status);
+
     return 0;
 }
 
 DS9481P_API int ds9481p_i2c_read_byte_ack(ds9481p_device_handle handle, unsigned char* byte) {
-    DBG("i2c_read_byte_ack: requesting read with ACK (0x52 'R')");
-    int rc = read_byte_with_command(handle, 0x52, byte); // I2C read byte with ACK
-    if (rc == 0) DBG("i2c_read_byte_ack: got 0x%02X", *byte);
-    return rc;
+    if (!handle || !byte) return -1;
+
+    // Flush the read buffer so we don't get stale content
+    tcflush(handle->fd, TCIFLUSH);
+    
+    uint8_t cmd = CMD_READ_BYTE_ACK;
+    PRINT_CMD_FUN(cmd);
+    if (write(handle->fd, &cmd, 1) != 1) {
+        perror("ds9481p_i2c_read_byte_ack: write failed");
+        return -1;
+    }
+    if (read(handle->fd, byte, 1) != 1) {
+        perror("ds9481p_i2c_read_byte_ack: read failed");
+        return -1;
+    }
+    DBG("i2c_read_byte_ack: got 0x%02X", *byte);
+    return 0;
 }
 
 DS9481P_API int ds9481p_i2c_read_byte_nack(ds9481p_device_handle handle, unsigned char* byte) {
-    DBG("i2c_read_byte_nack: requesting read with NACK (0x4E 'N')");
-    int rc = read_byte_with_command(handle, 0x4E, byte); // I2C read byte with NACK
-    if (rc == 0) DBG("i2c_read_byte_nack: got 0x%02X", *byte);
-    return rc;
+    if (!handle || !byte) return -1;
+
+    // Flush the read buffer so we don't get stale content
+    tcflush(handle->fd, TCIFLUSH);
+    
+    uint8_t cmd = CMD_READ_BYTE_NACK;
+    PRINT_CMD_FUN(cmd);
+    if (write(handle->fd, &cmd, 1) != 1) {
+        perror("ds9481p_i2c_read_byte_nack: write failed");
+        return -1;
+    }
+    if (read(handle->fd, byte, 1) != 1) {
+        perror("ds9481p_i2c_read_byte_nack: read failed");
+        return -1;
+    }
+    DBG("i2c_read_byte_nack: got 0x%02X", *byte);
+    return 0;
 }
 
 DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, int* minor) {
-    if (!handle || !major || !minor) {
+    if (!handle || !major || !minor) return -1;
+    
+    // Flush the read buffer so we don't get stale content
+    tcflush(handle->fd, TCIFLUSH);
+
+    uint8_t cmd = CMD_READ_VERSION;
+    PRINT_CMD_FUN(cmd);
+    if (write(handle->fd, &cmd, 1) != 1) {
+        perror("ds9481p_get_version: write failed");
         return -1;
     }
-    DBG("get_version: sending 0x56 ('V')");
-
-    unsigned char version_byte;
-    if (read_byte_with_command(handle, 0x56, &version_byte) != 0) { // Get version command
-        perror("ds9481p_get_version: failed to read version");
+    uint8_t version_byte;
+    if (read(handle->fd, &version_byte, 1) != 1) {
+        perror("ds9481p_get_version: read failed");
         return -1;
     }
 
@@ -223,12 +296,9 @@ DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, in
 }
 
 DS9481P_API int ds9481p_reset_adapter(ds9481p_device_handle handle) {
-    if(!handle) {
-        return -1;
-    }
-    DBG("reset_adapter: sending 0xC1");
-
-    char cmd = 0xC1; // Reset adapter command
+    if (!handle) return -1;
+    char cmd = CMD_RESET_ADAPTER;
+    PRINT_CMD_FUN(cmd);
     if (write(handle->fd, &cmd, 1) != 1) {
         perror("ds9481p_reset_adapter: write failed");
         return -1;
@@ -236,31 +306,51 @@ DS9481P_API int ds9481p_reset_adapter(ds9481p_device_handle handle) {
 
     // Wait for the device to be ready
     usleep(100000); // 100ms
-    DBG("reset_adapter: done, waited 100ms");
+    
+    // Free the handle (according to the data sheet)
+    ds9481p_close(handle);
+
+    // Reopen the port
+    char local_pname[256] = {0};
+    strncpy(local_pname, _port_name, sizeof(local_pname) - 1);
+    handle = ds9481p_open(local_pname);
+    if (!handle) {
+        fprintf(stderr, "Failed to reopen device after reset.\n");
+        return -1;
+    }
 
     return 0;
 }
 
 DS9481P_API int ds9481p_read_status(ds9481p_device_handle handle, unsigned char* status) {
-    DBG("read_status: querying status (0x48 'H')");
-    int rc = read_byte_with_command(handle, 0x48, status); // Read status command
-    if (rc == 0) DBG("read_status: status=0x%02X", *status);
-    return rc;
+    if (!handle || !status) return -1;
+
+    // Flush the read buffer so we don't get stale content
+    tcflush(handle->fd, TCIFLUSH);
+
+    uint8_t cmd = CMD_READ_STATUS;
+    PRINT_CMD_FUN(cmd);
+    if (write(handle->fd, &cmd, 1) != 1) {
+        perror("ds9481p_read_status: write failed");
+        return -1;
+    }
+    if (read(handle->fd, status, 1) != 1) {
+        perror("ds9481p_read_status: read failed");
+        return -1;
+    }
+    DBG("read_status: status=0x%02X", *status);
+    return 0;
 }
 
 DS9481P_API int ds9481p_enter_1wire_mode(ds9481p_device_handle handle) {
-    if (!handle) {
-        return -1;
-    }
-    DBG("enter_1wire_mode: sending 0x43 0x4F ('C' 'O')");
-
-    // Return to 1-Wire mode
-    char commands[] = { 0x43, 0x4F };
-    if (write(handle->fd, commands, sizeof(commands)) != sizeof(commands)) {
+    if (!handle) return -1;
+    uint8_t cmd[] = { CMD_RETURN_TO_1_WIRE_MODE[0], CMD_RETURN_TO_1_WIRE_MODE[1] };
+    PRINT_CMD_FUN(cmd[0]);
+    PRINT_CMD_FUN(cmd[1]);
+    if (write(handle->fd, cmd, sizeof(cmd)) != sizeof(cmd)) {
         perror("ds9481p_enter_1wire_mode: write failed");
         return -1;
     }
     DBG("enter_1wire_mode: done");
-
     return 0;
 }

@@ -82,6 +82,14 @@ DS9481P_API int ds9481p_enter_1wire_mode(ds9481p_device_handle handle);
 DS9481P_API int ds9481p_i2c_start(ds9481p_device_handle handle);
 
 /**
+ * @brief Sends an I2C repeated start condition.
+ *
+ * @param handle A valid device handle.
+ * @return 0 on success, -1 on failure.
+ */
+DS9481P_API int ds9481p_i2c_repeated_start(ds9481p_device_handle handle);
+
+/**
  * @brief Sends an I2C stop condition.
  *
  * @param handle A valid device handle.
@@ -97,6 +105,15 @@ DS9481P_API int ds9481p_i2c_stop(ds9481p_device_handle handle);
  * @return 0 on success, -1 on failure.
  */
 DS9481P_API int ds9481p_i2c_write_byte(ds9481p_device_handle handle, unsigned char byte);
+
+/**
+ * @brief Writes a byte to the I2C bus, reads the status register back.
+ *
+ * @param handle A valid device handle.
+ * @param byte The byte to write.
+ * @return 0 on success, -1 on failure.
+ */
+DS9481P_API int ds9481p_i2c_write_byte_status(ds9481p_device_handle handle, unsigned char byte, unsigned char* status);
 
 /**
  * @brief Reads a byte from the I2C bus and sends an ACK.

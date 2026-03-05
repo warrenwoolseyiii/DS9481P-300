@@ -37,7 +37,8 @@ void scan_i2c_bus(ds9481p_device_handle handle) {
 
         // Set slave address with write bit (0)
         // A non-zero return value from write indicates an error (e.g., NACK)
-        if (ds9481p_i2c_write_byte(handle, (address << 1) | 0) == 0) {
+        uint8_t status = 0xFF;
+        if (ds9481p_i2c_write_byte_status(handle, (address << 1) | 0, &status) == 0 && status == 0) {
             if (found_count == 0) {
                  printf("\nFound I2C devices at the following addresses:\n");
             }
