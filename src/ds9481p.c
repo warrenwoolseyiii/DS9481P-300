@@ -154,23 +154,18 @@ DS9481P_API int ds9481p_i2c_stop(ds9481p_device_handle handle) {
 
 DS9481P_API int ds9481p_i2c_write_byte(ds9481p_device_handle handle, unsigned char byte) {
     if (!handle) return -1;
-    DBG("i2c_write_byte: sending 0x57 0x%02X ('W' + 0x%02X)", byte, byte);
-    char cmd[] = { 0x57, byte }; // I2C write byte command
+    DBG("i2c_write_byte: sending 0x51 0x%02X ('Q' + 0x%02X)", byte, byte);
+    char cmd[] = { 0x51, byte }; // I2C write byte command
     if (write(handle->fd, cmd, sizeof(cmd)) != sizeof(cmd)) {
         perror("ds9481p_i2c_write_byte: write failed");
         return -1;
     }
-    unsigned char status = 0;
-    if(ds9481p_read_status(handle, &status) == 0x01) {
-        DBG("i2c_write_byte: read_status FAILED for byte 0x%02X", byte);
+    unsigned char status;
+    if (read(handle->fd, &status, 1) != 1) {
         perror("ds9481p_i2c_write_byte: read status failed");
         return -1;
     }
-    DBG("i2c_write_byte: status=0x%02X for byte 0x%02X (%s)", status, byte,
-        status == 0x01 ? "ACK" : "NACK");
-    if(status == 0x01) {
-        perror("ds9481p_i2c_write_byte: I2C write error");
-    }
+    DBG("i2c_write_byte: status=0x%02X for byte 0x%02X", status, byte);
     return (status == 0x01) ? -1 : 0;
 }
 
