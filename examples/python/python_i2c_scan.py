@@ -55,12 +55,13 @@ def main():
             for address in range(1, 128):
                 try:
                     device.i2c_start()
-                    # Set slave address with write bit (0)
-                    # The device will send an ACK if a slave responds.
-                    device.i2c_write_byte((address << 1) | 0)
-                    found_devices.append(address)
+                    # Write slave address with write bit (0) and check
+                    # the adapter status: 0x00 = ACK (device present).
+                    status = device.i2c_write_byte_status((address << 1) | 0)
+                    if status == 0x00:
+                        found_devices.append(address)
                 except RuntimeError:
-                    # No device responded at this address
+                    # Serial I/O failure — skip this address
                     pass
                 finally:
                     # Always send a stop condition to release the bus

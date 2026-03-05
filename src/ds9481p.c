@@ -49,7 +49,7 @@ static const uint8_t CMD_READ_VERSION = 0x56; // 'V'
 static const uint8_t CMD_SET_MODE = 0x4D; // 'M'
 static const uint8_t CMD_RETURN_TO_1_WIRE_MODE[] = {0x43, 0x4F}; // 'CO'
 static const uint8_t CMD_PACKETIZED_DATA = 0x5A; // 'Z'
-static const unsigned int I2C_DELAY_MS = 10;
+static const unsigned int I2C_DELAY_US = 10000;
 
 /**
  * @brief Macro to print the command and function name
@@ -73,14 +73,14 @@ char _port_name[256];
  * @param handle The device handle.
  * @param buffer The buffer to store the read data.
  * @param length The number of bytes to read.
- * @param timeout_ms The timeout in milliseconds.
+ * @param timeout_us The timeout in microseconds.
  * @return number of bytes read on success, -1 on failure.
  */
-DS9481P_API static int _read_wrapper(ds9481p_device_handle handle, uint8_t* buffer, size_t length, unsigned int timeout_ms) {
+DS9481P_API static int _read_wrapper(ds9481p_device_handle handle, uint8_t* buffer, size_t length, unsigned int timeout_us) {
     int len = read(handle->fd, buffer, length);
     if (len != (int)length) {
         if (len == -1) len = 0;
-        usleep(timeout_ms * 1000);
+        usleep(timeout_us);
         int len2 = read(handle->fd, buffer + len, length - len);
         if (len2 == -1) len2 = 0;
         len += len2;
@@ -243,7 +243,7 @@ DS9481P_API int ds9481p_i2c_write_byte_status(ds9481p_device_handle handle, unsi
         return -1;
     }
 
-    if (_read_wrapper(handle, status, 1, I2C_DELAY_MS) != 1) {
+    if (_read_wrapper(handle, status, 1, I2C_DELAY_US) != 1) {
         perror("ds9481p_i2c_write_byte_status: read status failed");
         return -1;
     }
@@ -265,7 +265,7 @@ DS9481P_API int ds9481p_i2c_read_byte_ack(ds9481p_device_handle handle, unsigned
         perror("ds9481p_i2c_read_byte_ack: write failed");
         return -1;
     }
-    if (_read_wrapper(handle, byte, 1, I2C_DELAY_MS) != 1) {
+    if (_read_wrapper(handle, byte, 1, I2C_DELAY_US) != 1) {
         perror("ds9481p_i2c_read_byte_ack: read failed");
         return -1;
     }
@@ -285,7 +285,7 @@ DS9481P_API int ds9481p_i2c_read_byte_nack(ds9481p_device_handle handle, unsigne
         perror("ds9481p_i2c_read_byte_nack: write failed");
         return -1;
     }
-    if (_read_wrapper(handle, byte, 1, I2C_DELAY_MS) != 1) {
+    if (_read_wrapper(handle, byte, 1, I2C_DELAY_US) != 1) {
         perror("ds9481p_i2c_read_byte_nack: read failed");
         return -1;
     }
@@ -306,7 +306,7 @@ DS9481P_API int ds9481p_get_version(ds9481p_device_handle handle, int* major, in
         return -1;
     }
     uint8_t version_byte;
-    if (_read_wrapper(handle, &version_byte, 1, I2C_DELAY_MS) != 1) {
+    if (_read_wrapper(handle, &version_byte, 1, I2C_DELAY_US) != 1) {
         perror("ds9481p_get_version: read failed");
         return -1;
     }
@@ -357,7 +357,7 @@ DS9481P_API int ds9481p_read_status(ds9481p_device_handle handle, unsigned char*
         perror("ds9481p_read_status: write failed");
         return -1;
     }
-    if (_read_wrapper(handle, status, 1, I2C_DELAY_MS) != 1) {
+    if (_read_wrapper(handle, status, 1, I2C_DELAY_US) != 1) {
         perror("ds9481p_read_status: read failed");
         return -1;
     }

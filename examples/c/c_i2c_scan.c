@@ -25,6 +25,11 @@
 #include <unistd.h>
 #include "ds9481p.h"
 
+// STHS34PF80 constants
+#define STHS34PF80_ADDR       0x5A
+#define WHO_AM_I_REG          0x0F
+#define WHO_AM_I_EXPECTED     0xD3
+
 void scan_i2c_bus(ds9481p_device_handle handle) {
     printf("Scanning for I2C devices (addresses 1-127)...\n");
     int found_count = 0;
@@ -53,6 +58,64 @@ void scan_i2c_bus(ds9481p_device_handle handle) {
 
     if (found_count == 0) {
         printf("\nNo I2C devices found.\n");
+    }
+}
+
+void read_who_am_i(ds9481p_device_handle handle) {
+    printf("\nReading STHS34PF80 WHO_AM_I register (0x%02X)...\n", WHO_AM_I_REG);
+
+    uint8_t status;
+
+    // START
+    if (ds9481p_i2c_start(handle) != 0) {
+        fprintf(stderr, "  WHO_AM_I: START failed\n");
+        return;
+    }
+
+    // Write slave address (write mode)
+    if (ds9481p_i2c_write_byte_status(handle, (STHS34PF80_ADDR << 1) | 0, &status) != 0 || status != 0) {
+        fprintf(stderr, "  WHO_AM_I: addr+W NACK (status=0x%02X)\n", status);
+        ds9481p_i2c_stop(handle);
+        return;
+    }
+
+    // Write register address
+    if (ds9481p_i2c_write_byte_status(handle, WHO_AM_I_REG, &status) != 0 || status != 0) {
+        fprintf(stderr, "  WHO_AM_I: reg addr NACK (status=0x%02X)\n", status);
+        ds9481p_i2c_stop(handle);
+        return;
+    }
+
+    // Repeated START
+    if (ds9481p_i2c_repeated_start(handle) != 0) {
+        fprintf(stderr, "  WHO_AM_I: repeated START failed\n");
+        ds9481p_i2c_stop(handle);
+        return;
+    }
+
+    // Write slave address (read mode)
+    if (ds9481p_i2c_write_byte_status(handle, (STHS34PF80_ADDR << 1) | 1, &status) != 0 || status != 0) {
+        fprintf(stderr, "  WHO_AM_I: addr+R NACK (status=0x%02X)\n", status);
+        ds9481p_i2c_stop(handle);
+        return;
+    }
+
+    // Read one byte with NACK (last/only byte)
+    uint8_t who_am_i = 0;
+    if (ds9481p_i2c_read_byte_nack(handle, &who_am_i) != 0) {
+        fprintf(stderr, "  WHO_AM_I: read failed\n");
+        ds9481p_i2c_stop(handle);
+        return;
+    }
+
+    // STOP
+    ds9481p_i2c_stop(handle);
+
+    // Report result
+    if (who_am_i == WHO_AM_I_EXPECTED) {
+        printf("  WHO_AM_I = 0x%02X ✓ (matches STHS34PF80)\n", who_am_i);
+    } else {
+        printf("  WHO_AM_I = 0x%02X ✗ (expected 0x%02X)\n", who_am_i, WHO_AM_I_EXPECTED);
     }
 }
 
@@ -92,6 +155,19 @@ int main(int argc, char *argv[]) {
     }
 
     scan_i2c_bus(handle);
+
+    // TODO: This is sensor specific test code
+    // for(int i = 0; i < 1000; i++)
+    //     read_who_am_i(handle);
+
+    for(int i = 0; i < 2; i++) {
+        int major, minor;
+        if (ds9481p_get_version(handle, &major, &minor) == 0) {
+            printf("Device Firmware Version: %d.%d\n", major, minor);
+        } else {
+            fprintf(stderr, "Failed to get device version.\n");
+        }
+    }
 
     ds9481p_close(handle);
     printf("Device connection closed.\n");

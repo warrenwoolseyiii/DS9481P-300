@@ -40,11 +40,17 @@ _lib.ds9481p_enter_1wire_mode.restype = ctypes.c_int
 _lib.ds9481p_i2c_start.argtypes = [ctypes.c_void_p]
 _lib.ds9481p_i2c_start.restype = ctypes.c_int
 
+_lib.ds9481p_i2c_repeated_start.argtypes = [ctypes.c_void_p]
+_lib.ds9481p_i2c_repeated_start.restype = ctypes.c_int
+
 _lib.ds9481p_i2c_stop.argtypes = [ctypes.c_void_p]
 _lib.ds9481p_i2c_stop.restype = ctypes.c_int
 
 _lib.ds9481p_i2c_write_byte.argtypes = [ctypes.c_void_p, ctypes.c_ubyte]
 _lib.ds9481p_i2c_write_byte.restype = ctypes.c_int
+
+_lib.ds9481p_i2c_write_byte_status.argtypes = [ctypes.c_void_p, ctypes.c_ubyte, ctypes.POINTER(ctypes.c_ubyte)]
+_lib.ds9481p_i2c_write_byte_status.restype = ctypes.c_int
 
 _lib.ds9481p_i2c_read_byte_ack.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ubyte)]
 _lib.ds9481p_i2c_read_byte_ack.restype = ctypes.c_int
@@ -92,15 +98,34 @@ class DS9481P:
         if _lib.ds9481p_i2c_start(self._handle) != 0:
             raise RuntimeError("I2C start failed")
 
+    def i2c_repeated_start(self):
+        """Sends an I2C repeated-start condition."""
+        if _lib.ds9481p_i2c_repeated_start(self._handle) != 0:
+            raise RuntimeError("I2C repeated start failed")
+
     def i2c_stop(self):
         """Sends an I2C stop condition."""
         if _lib.ds9481p_i2c_stop(self._handle) != 0:
             raise RuntimeError("I2C stop failed")
 
     def i2c_write_byte(self, byte):
-        """Writes a single byte to the I2C bus."""
+        """Writes a single byte to the I2C bus (no status readback)."""
         if _lib.ds9481p_i2c_write_byte(self._handle, byte) != 0:
             raise RuntimeError("I2C write byte failed")
+
+    def i2c_write_byte_status(self, byte):
+        """Writes a byte and reads the adapter status register back.
+
+        Returns:
+            The status byte (0x00 = ACK received, non-zero = NACK/error).
+
+        Raises:
+            RuntimeError: If the underlying serial I/O fails.
+        """
+        status = ctypes.c_ubyte()
+        if _lib.ds9481p_i2c_write_byte_status(self._handle, byte, ctypes.byref(status)) != 0:
+            raise RuntimeError("I2C write byte with status failed")
+        return status.value
 
     def i2c_read_byte(self, ack=True):
         """Reads a single byte from the I2C bus."""
