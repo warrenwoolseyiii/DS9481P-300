@@ -81,7 +81,6 @@ int main(int argc, char *argv[]) {
     }
     
     printf("Switched to I2C mode.\n");
-    usleep(100000); // 100ms delay
 
     for(int i = 0; i < 2; i++) {
         int major, minor;
