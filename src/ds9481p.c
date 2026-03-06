@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <time.h>
 
 #ifdef DS9481P_DEBUG
   #define DBG(fmt, ...) fprintf(stderr, "[DS9481P] " fmt "\n", ##__VA_ARGS__)
@@ -49,7 +50,7 @@ static const uint8_t CMD_READ_VERSION = 0x56; // 'V'
 static const uint8_t CMD_SET_MODE = 0x4D; // 'M'
 static const uint8_t CMD_RETURN_TO_1_WIRE_MODE[] = {0x43, 0x4F}; // 'CO'
 static const uint8_t CMD_PACKETIZED_DATA = 0x5A; // 'Z'
-static const unsigned int I2C_DELAY_US = 10000;
+static const unsigned int I2C_DELAY_US = 50000;
 
 /**
  * @brief Macro to print the command and function name
@@ -77,14 +78,27 @@ char _port_name[256];
  * @return number of bytes read on success, -1 on failure.
  */
 DS9481P_API static int _read_wrapper(ds9481p_device_handle handle, uint8_t* buffer, size_t length, unsigned int timeout_us) {
-    int len = read(handle->fd, buffer, length);
-    if (len != (int)length) {
-        if (len == -1) len = 0;
-        usleep(timeout_us);
-        int len2 = read(handle->fd, buffer + len, length - len);
-        if (len2 == -1) len2 = 0;
-        len += len2;
+    struct timespec start, now;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    int len = 0;
+    while ((size_t)len < length) {
+        int n = read(handle->fd, buffer + len, length - len);
+        if (n > 0) {
+            len += n;
+            if ((size_t)len >= length) break;
+        }
+
+        // Sleep 1000 μs between attempts
+        usleep(1000);
+
+        // Check elapsed time
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        long elapsed_us = (now.tv_sec - start.tv_sec) * 1000000L
+                        + (now.tv_nsec - start.tv_nsec) / 1000L;
+        if (elapsed_us >= (long)timeout_us) break;
     }
+
     return len;
 }
 
